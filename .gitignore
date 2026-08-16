@@ -1,0 +1,7 @@
+*.env
+*.pdf
+**/audios/
+**/quads_4*/
+**/videos/
+**/frames*/
+**/Temp/

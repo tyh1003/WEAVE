@@ -1,0 +1,3 @@
+{"dataset": "FakeSV", "num_samples": 3623, "accuracy": 0.8763, "f1": 0.8657, "precision": 0.9475, "recall": 0.7969, "brier_score": 0.4854, "logloss": 13.3928, "average_token": 7081.05, "average_time": 23.6976}
+{"dataset": "FakeTT", "num_samples": 1990, "accuracy": 0.8729, "f1": 0.89, "precision": 0.9069, "recall": 0.8736, "brier_score": 0.3975, "logloss": 8.9037, "average_token": 10674.58, "average_time": 16.9489}
+{"dataset": "ALL", "num_samples": 5613, "accuracy": 0.8751, "f1": 0.8756, "precision": 0.9302, "recall": 0.827, "brier_score": 0.4542, "logloss": 11.8013, "average_token": 8355.08, "average_time": 21.305}
