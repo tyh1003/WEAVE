@@ -1,292 +1,117 @@
 # WEAVE: Web Evidence-Assisted Video Examination
 
-**From Web Evidence to Compact Verifiers: Distilling Verdicts and Rationales for Short-Video Misinformation Detection**
+> **From Web Evidence to Compact Verifiers: Distilling Verdicts and Rationales for Short-Video Misinformation Detection**
 
-Research code for **WEAVE (Web Evidence-Assisted Video Examination)**, a framework for evidence-grounded short-video misinformation detection that separates multimodal evidence preparation from compact verdict–rationale generation.
+Research code for **WEAVE (Web Evidence-Assisted Video Examination)**, a framework for evidence-grounded short-video misinformation detection that transfers the final **verdict–rationale generation** task to a compact language model.
 
-WEAVE reconstructs claims from short-video content, organizes the available information into four source-aware evidence fields, uses a large teacher to produce offline verdict–rationale supervision, and adapts a compact language model to generate the final decision and explanation.
-
-> **Interactive demo**  
-> The original WebApp repository is retained here:  
-> [WEAVE-WebApp](https://github.com/tyh1003/WEAVE-WebApp)
+WEAVE reconstructs claims from short-video content, organizes multimodal and Web-assisted information into four source-aware evidence fields, uses a large reasoning teacher to generate offline supervision, and adapts a compact language model to produce both the final misinformation verdict and an inspectable rationale.
 
 ---
 
 ## Paper
 
-**Title:** *From Web Evidence to Compact Verifiers: Distilling Verdicts and Rationales for Short-Video Misinformation Detection*
+**Full paper:** [weave_bigdata26.pdf](./weave_bigdata26.pdf)
 
-**Authors:** Chun-Yi Shih, Kai-Yun Hsiao, Yi-Hsien Tsai, Cheng-Te Li  
-**Affiliation:** Department of Computer Science and Information Engineering, National Cheng Kung University, Taiwan
+### Authors
+
+| Author | Role | Affiliation |
+|---|---|---|
+| **Chun-Yi Shih*** | Student | National Cheng Kung University, Tainan, Taiwan |
+| **Kai-Yun Hsiao*** | Student | National Cheng Kung University, Tainan, Taiwan |
+| **Yi-Hsien Tsai*** | Student | National Yang Ming Chiao Tung University, Hsinchu, Taiwan |
+| **Cheng-Te Li** | Advisor | National Cheng Kung University, Tainan, Taiwan |
+
+\* Chun-Yi Shih, Kai-Yun Hsiao, and Yi-Hsien Tsai contributed equally to this work.
 
 ### Keywords
 
-`short-video misinformation` · `Web evidence` · `multimodal verification` · `knowledge distillation` · `compact language models` · `verdict-rationale generation`
+`short-video misinformation` · `Web evidence` · `multimodal verification` · `knowledge distillation` · `compact language models`
 
 ---
 
 ## Overview
 
-A short video can contain genuine footage while still communicating a misleading claim. The mismatch may come from a changed caption, an incorrect date or location, reused footage, an unrelated narrative, or a false statement shown visually on screen.
+A genuine short video can spread misinformation when its caption changes the event, place, time, or surrounding context. Fact-checking therefore requires more than recognizing objects or detecting visual manipulation: the verifier must recover the claim, identify relevant event evidence, and explain how the evidence supports or contradicts that claim.
 
-This makes short-video misinformation detection more than a conventional video-classification problem. A verifier must answer three questions:
+**WEAVE** addresses this problem through a claim-centered evidence interface and compact verdict–rationale generation.
 
-1. **What claim is the video actually conveying?**
-2. **What does the video itself show or say?**
-3. **Does reliable background information support or contradict that claim?**
+The framework separates:
 
-WEAVE addresses this problem by separating the system into two computational roles:
+- reconstructed textual claims;
+- video accounts;
+- model-generated background knowledge;
+- Web-assisted external context.
 
-- a **large-model evidence-preparation and supervision stage**, which reconstructs claims, organizes multimodal observations, retrieves Web-assisted context, and produces offline teacher responses;
-- a **compact generative verifier**, which learns to map the prepared evidence to a structured verdict and rationale.
-
-The final compact verifier does not receive raw video at inference time. Instead, it operates on an evidence record that explicitly separates the textual claim, video account, model background, and Web-assisted context.
+A large reasoning teacher generates offline verdict–rationale targets. Teacher-correct responses are used to supervise a compact language model, which is adapted using QLoRA to generate both the final verdict and its rationale.
 
 ---
 
-## Main Contributions
+## Framework
 
-### 1. Claim-centered evidence interface
-
-WEAVE represents each video using four text fields with explicit information roles:
-
-- `Rc` — reconstructed textual claim;
-- `Rv` — video account containing visual claims and event observations;
-- `K_int` — model-generated internal/background knowledge;
-- `K_ext` — Web-assisted external context.
-
-This representation is designed to preserve claims regardless of whether they appear in a title, speech, or visually displayed text.
-
-### 2. Joint verdict–rationale supervision
-
-A large teacher produces structured responses containing both:
-
-- a binary misinformation verdict; and
-- a concise natural-language rationale.
-
-The student is trained with separately normalized label and rationale losses so that the short verdict is not overwhelmed by the larger number of rationale tokens.
-
-### 3. Compact evidence-conditioned verification
-
-The compact verifier learns the final evidence comparison rather than merely reproducing an intermediate representation. At inference time, it generates both the verdict and the explanation from the prepared evidence record without teacher involvement.
-
-### 4. Teacher-conditioned evaluation
-
-Student behavior is analyzed separately on:
-
-- **Test 1:** held-out examples originally predicted correctly by the teacher;
-- **Test 2:** examples originally misclassified by the teacher and excluded from student training.
-
-This distinguishes retention of useful teacher behavior from student behavior on teacher-error cases.
-
-### 5. Inspectable generated rationales
-
-A correct label does not automatically imply that its explanation is supported by the evidence. WEAVE therefore treats rationale inspection as a separate analysis target and examines whether the generated explanation states an identifiable claim–evidence agreement or discrepancy.
-
----
-
-## WEAVE Architecture
+WEAVE separates online evidence preparation from offline distillation.
 
 ```text
-                             Short Video
-                       + Title / Description
-                                │
-             ┌──────────────────┴──────────────────┐
-             │                                     │
-             ▼                                     ▼
-      Audio Transcription                   Visual Processing
-     Whisper Large V3               ┌──────────────┴──────────────┐
-             │                      │                             │
-             │               Representative Frames      Chronological Description
-             │                    up to 16 frames          Qwen3-VL-4B-Instruct
-             │                      │                             │
-             └──────────────────────┴──────────────┬──────────────┘
-                                                  │
-                                                  ▼
-                               Web-Assisted Evidence Preparation
-                              Gemma 4 31B IT + Google Search
-                                                  │
-                         ┌────────────────────────┼────────────────────────┐
-                         │                        │                        │
-                         ▼                        ▼                        ▼
-                        Rc                       Rv                  K_int / K_ext
-                 Textual Claim             Video Account              Background
-                         └────────────────────────┬────────────────────────┘
-                                                  │
-                       ┌──────────────────────────┴──────────────────────────┐
-                       │                                                     │
-                       │ OFFLINE TRAINING                                    │ INFERENCE
-                       ▼                                                     ▼
-              Large Teacher Response                              Compact Student Verifier
-              verdict + rationale                                  evidence comparison
-                       │                                                     │
-                       ▼                                                     ▼
-              Teacher supervision                                  {pred_label, reason}
-                       │
-                       ▼
-          QLoRA adaptation of compact student
-          with label/rationale segment losses
+Short Video + Title / Description
+                |
+                v
+       Multimodal Content Recovery
+        /                    \
+       /                      \
+Whisper Large V3       Visual Processing
+Speech Transcript      Representative Frames
+                       + Qwen3-VL Description
+       \                      /
+        \                    /
+                |
+                v
+     Web-Assisted Evidence Preparation
+       Gemma 4 31B IT + Google Search
+                |
+                v
+       Four-Field Evidence Interface
+       +--------+--------+--------+
+       |        |        |        |
+      Rc       Rv      K_int    K_ext
+       |        |        |        |
+       +--------+--------+--------+
+                |
+        +-------+-------+
+        |               |
+        v               v
+ Offline Distillation   Online Inference
+        |               |
+ Teacher Verdict +      Compact WEAVE
+ Rationale              Verifier
+        |               |
+ Teacher-Correct        Verdict + Rationale
+ Supervision
+        |
+        v
+ QLoRA Adaptation
 ```
 
-The key architectural distinction is that **evidence preparation** and **final response generation** are separate tasks. Large-model computation is used upstream to prepare structured evidence, while the compact student learns the final claim–evidence comparison.
+The central idea is that **evidence preparation and final judgment are different tasks**. Large models recover and organize relevant evidence, while the compact verifier performs the final evidence comparison.
 
 ---
 
-## Problem Formulation
+## Evidence Interface
 
-For video example `i`, let
+For each video, WEAVE constructs four text fields:
 
-- `b_i` denote the video frames;
-- `u_i` denote the audio track;
-- `t_i` denote the title or description;
-- `y_i ∈ {0,1}` denote the dataset label, where `0 = real` and `1 = fake/misleading`.
+| Field | Meaning | Role |
+|---|---|---|
+| `Rc` | Reconstructed textual claim | Recovers assertions expressed through the title and speech |
+| `Rv` | Video account | Preserves visible claims, actions, entities, locations, dates, and event observations |
+| `K_int` | Internal background | Provides relevant model-generated background information |
+| `K_ext` | Web-assisted context | Provides search-assisted external event information |
 
-Given Web information `W_i`, the evidence-preparation function constructs
+The evidence record is conceptually:
 
 ```text
 x_i = [Rc_i, Rv_i, K_int,i, K_ext,i]
 ```
 
-where:
-
-| Field | Meaning | Primary role |
-|---|---|---|
-| `Rc` | Reconstructed textual claim | Recover assertions expressed through title and speech |
-| `Rv` | Video account | Preserve visual claims, visible assertions, and event observations |
-| `K_int` | Internal/model background | Supply related entity and event knowledge |
-| `K_ext` | Web-assisted context | Compare the claim against external accounts |
-
-The compact verifier receives these four fields plus a verification instruction and generates:
-
-```json
-{
-  "pred_label": 0,
-  "reason": "A concise evidence-grounded explanation of the decisive agreement or discrepancy."
-}
-```
-
----
-
-## Method
-
-### 1. Multimodal Content Representation
-
-WEAVE accepts a short video together with its title or description.
-
-### 1.1 Speech transcription
-
-Audio is transcribed with **Whisper Large V3**.
-
-If the video contains no usable audio, or transcription fails, the transcript is treated as an empty string and the remaining modalities continue through the pipeline.
-
-### 1.2 Representative-frame view
-
-A visual path supplies up to **16 representative images** distributed over the duration of the video.
-
-For a video with duration `d > 0`, target frame times are distributed from the beginning to the end of the clip. Failed frame reads are skipped, and the final target uses the last decodable frame near the end of the video.
-
-The purpose of this view is to preserve fine visual information, especially short-lived on-screen assertions that may not appear in the audio transcript.
-
-### 1.3 Chronological visual description
-
-A second visual path uses **Qwen3-VL-4B-Instruct** to construct a temporal description of the video.
-
-Paper configuration:
-
-| Setting | Value |
-|---|---|
-| Visual model | Qwen3-VL-4B-Instruct |
-| Sampling | 5 FPS |
-| Maximum sampled frames | 120 |
-| Image resolution | Dynamic |
-| Quantization | 4-bit NF4 |
-| Example hardware | RTX 5070 Laptop GPU, 8 GB |
-
-The visual-description prompt used in the paper is:
-
-> Objectively describe the visual content of the video in temporal order. Respond in Traditional Chinese.
-
-The representative images and chronological description are complementary: images preserve local details, while the generated description summarizes event order.
-
----
-
-### 2. Web-Assisted Evidence Construction
-
-The paper uses **Gemma 4 31B IT** through the Gemini API with **temperature 0** and **Google Search enabled**.
-
-A single external-model preparation request constructs the four evidence fields.
-
-### `Rc`: reconstructed textual claim
-
-Constructed from:
-
-- the title or description;
-- the speech transcript.
-
-Its role is to recover the explicit textual assertion rather than provide a generic summary.
-
-### `Rv`: video account
-
-Constructed from:
-
-- `Rc`;
-- the chronological visual description;
-- the ordered representative frames.
-
-`Rv` should preserve:
-
-- visible claims;
-- people and entities;
-- actions;
-- locations;
-- dates or temporal cues;
-- event order;
-- observations needed for fact checking.
-
-### `K_int`: internal background
-
-Contains background supplied from the model's parametric knowledge.
-
-This field is kept separate from search-derived evidence so that the source role of each piece of information remains explicit.
-
-### `K_ext`: Web-assisted context
-
-Contains information obtained through search-assisted verification.
-
-Searches should target the specific event and use relevant combinations of:
-
-- entity names;
-- actions;
-- locations;
-- dates;
-- event-specific terminology.
-
-The paper favors authoritative sources and stores deduplicated search queries and source links as provenance metadata outside the four-field student input.
-
----
-
-### 3. Verification Contract
-
-The verifier is instructed to compare the assertion carried by the video with the supplied evidence rather than merely detect familiar entities.
-
-The comparison includes checks for:
-
-- reused footage with changed context;
-- reassigned locations or settings;
-- incorrect entities;
-- incorrect dates or other precise details;
-- attachment of an unrelated narrative;
-- physical implausibility;
-- contradictions between textual claims and visible events.
-
-Important evidence rules include:
-
-- use both internal and external background when making the comparison;
-- do not infer falsity only because search results are missing;
-- do not invent absent dates or details and then use them as contradictions;
-- explain the decisive agreement or discrepancy rather than simply restating the predicted label.
-
-### Output contract
+The compact verifier receives these fields together with the verification instruction and generates:
 
 ```json
 {
@@ -304,11 +129,104 @@ Label convention:
 
 ---
 
+## Method
+
+### 1. Multimodal Content Representation
+
+WEAVE accepts a short video and its accompanying title or description.
+
+#### Speech Transcription
+
+Audio is transcribed using **Whisper Large V3**. If the video has no usable audio or transcription fails, the transcript is treated as an empty string and the other inputs continue through the pipeline.
+
+#### Representative Frames
+
+Up to **16 representative frames** are distributed over the video duration. This view provides the evidence-preparation model with direct access to visual details throughout the clip.
+
+#### Chronological Visual Description
+
+A second visual representation is produced with **Qwen3-VL-4B-Instruct**.
+
+Paper configuration:
+
+| Setting | Value |
+|---|---|
+| Visual model | Qwen3-VL-4B-Instruct |
+| Sampling | 5 FPS |
+| Maximum sampled frames | 120 |
+| Image resolution | Dynamic |
+| Quantization | 4-bit NF4 |
+| Example hardware | RTX 5070 Laptop GPU, 8 GB |
+
+The representative frames and chronological description are complementary: frames preserve local visual details, while the generated description summarizes event order.
+
+---
+
+### 2. Web-Assisted Evidence Preparation
+
+The paper uses **Gemma 4 31B IT** through the Gemini API with **temperature 0** and **Google Search enabled**.
+
+A single external-model preparation request constructs the four evidence fields.
+
+#### `Rc`: Reconstructed Textual Claim
+
+Constructed from:
+
+- title or description;
+- speech transcript.
+
+Its purpose is to recover the explicit textual assertion rather than provide a generic summary.
+
+#### `Rv`: Video Account
+
+Constructed from:
+
+- `Rc`;
+- chronological visual description;
+- ordered representative frames.
+
+It preserves verification-relevant details such as visible claims, entities, actions, locations, dates, temporal cues, and event order.
+
+#### `K_int`: Internal Background
+
+Contains relevant background supplied from the model's parametric knowledge.
+
+#### `K_ext`: Web-Assisted Context
+
+Contains information obtained through search-assisted verification. Searches target the specific event using combinations of entities, actions, locations, dates, and event-specific terminology.
+
+Search queries and source URLs are retained as provenance metadata outside the four-field student input.
+
+---
+
+### 3. Claim–Evidence Verification
+
+The verifier compares the assertion carried by the video against the supplied evidence.
+
+The comparison includes checks for:
+
+- reused footage with changed context;
+- reassigned locations or settings;
+- incorrect entities;
+- incorrect dates or precise details;
+- attachment of an unrelated narrative;
+- physical implausibility;
+- contradictions between textual claims and visible events.
+
+Important evidence rules include:
+
+- use both internal and external background information;
+- do not infer falsity only because search results are missing;
+- do not invent absent dates or details and then use them as contradictions;
+- explain the decisive agreement or discrepancy rather than simply restating the predicted label.
+
+---
+
 ### 4. Teacher Response Generation
 
 The large-model teacher receives the four-field evidence record and the finalized verification instruction.
 
-For each example, the teacher generates:
+For each example, it generates:
 
 ```text
 (predicted label, rationale)
@@ -316,7 +234,7 @@ For each example, the teacher generates:
 
 These responses are used as offline supervision for the compact verifier.
 
-The student therefore learns from **teacher-generated structured responses**, rather than from teacher logits.
+The student therefore learns from **teacher-generated structured responses**, rather than teacher logits.
 
 ---
 
@@ -324,24 +242,7 @@ The student therefore learns from **teacher-generated structured responses**, ra
 
 **DSPy** with **MIPROv2** is used during development of the verification instruction and demonstrations.
 
-It is used for the teacher reasoning stage **after the evidence fields have been prepared**.
-
-The development objective places most of its weight on prediction quality while retaining a smaller criterion for rationale completeness:
-
-```text
-Development objective
-│
-├── 95%  prediction quality
-│
-└──  5%  rationale completeness
-```
-
-The paper's development score uses:
-
-- `0.95 × (1 - squared label/probability error)`;
-- an additional `0.05` when the stripped reason contains at least 50 characters.
-
-DSPy and MIPROv2 are **development-time tools**. They are not executed by the compact student during inference.
+This stage occurs after the evidence fields have been prepared and is not executed by the compact student during inference.
 
 ---
 
@@ -349,10 +250,10 @@ DSPy and MIPROv2 are **development-time tools**. They are not executed by the co
 
 Let `I` denote examples with aligned evidence records, ground-truth labels, and teacher responses.
 
-The teacher-correct pool is
+The teacher-correct pool is:
 
 ```text
-C = { i ∈ I : teacher_prediction_i = ground_truth_i }
+C = { i in I : teacher_prediction_i = ground_truth_i }
 ```
 
 `C` is split with class stratification into:
@@ -364,17 +265,17 @@ C = { i ∈ I : teacher_prediction_i = ground_truth_i }
 Teacher-error examples form:
 
 ```text
-E2 = { i ∈ I : teacher_prediction_i != ground_truth_i }
+E2 = { i in I : teacher_prediction_i != ground_truth_i }
 ```
 
-The evaluation terminology is:
+Evaluation terminology:
 
 - **Test 1 = E1:** held-out teacher-correct examples;
 - **Test 2 = E2:** teacher-error examples excluded from student training.
 
-This protocol makes two student behaviors separately observable:
+This separates two behaviors:
 
-1. retention/generalization on useful teacher supervision;
+1. retention/generalization of useful teacher supervision;
 2. behavior on examples for which the original teacher was wrong.
 
 ---
@@ -383,54 +284,25 @@ This protocol makes two student behaviors separately observable:
 
 The principal compact backbone is **Gemma-3-1B-it**. **Gemma-2-2B-it** is evaluated as an additional backbone.
 
-For training example `i`:
+For each training example:
 
-- the verification instruction and the four evidence fields form the input prefix `h_i`;
-- the teacher's JSON label–reason response forms the target sequence `z_i`.
+- the verification instruction and four evidence fields form the input prefix;
+- the teacher JSON verdict–rationale response forms the target sequence.
 
-The supervised target positions are divided into:
-
-- `T_i^y`: label-token positions;
-- `T_i^e`: rationale-token positions.
-
-The segment loss is normalized separately:
-
-```math
-L_i^k = -\frac{1}{|T_i^k|}\sum_{t \in T_i^k}
-\log p_\theta(z_{it}\mid h_i,z_{i,<t}),
-\qquad k\in\{y,e\}
-```
-
-and the total training objective is
-
-```math
-L = \frac{1}{|D_{tr}|}\sum_{i\in D_{tr}}
-\left(\lambda_y L_i^y + \lambda_e L_i^e\right)
-```
-
-with
+WEAVE applies token-role weighting so that verdict prediction receives greater emphasis while rationale tokens continue to supervise evidence-grounded explanation generation.
 
 ```text
-lambda_y = 5
-lambda_e = 1
+Label-token weight     = 5
+Rationale-token weight = 1
 ```
 
-### Why separate normalization?
-
-The rationale usually contains many more tokens than the verdict. If ordinary token averaging were used without controlling the two segments, rationale length could dominate the objective simply because it contains more tokens.
-
-WEAVE therefore computes separate segment means and assigns an explicit larger coefficient to the verdict.
-
-This gives the system two simultaneous learning targets:
-
-- prioritize correct label generation;
-- preserve supervision for evidence-grounded explanation generation.
+Prompt and padding positions are masked from the loss.
 
 ---
 
 ### 8. QLoRA Adaptation
 
-The compact verifier is adapted with **QLoRA**.
+The compact verifier is adapted using **QLoRA**.
 
 The quantized base model remains frozen while low-rank adapters are optimized.
 
@@ -444,78 +316,47 @@ Adapters cover:
 - up projection;
 - down projection.
 
-### Paper training configuration
+Paper training configuration:
 
 | Item | Setting |
 |---|---|
-| Principal backbone | Gemma-3-1B-it |
-| Comparison backbone | Gemma-2-2B-it |
-| Base quantization | 4-bit NF4 + double quantization |
-| LoRA rank | 16 |
-| LoRA alpha | 32 |
-| LoRA dropout | 0.05 |
+| Base quantization | 4-bit NF4; double quantization |
+| Adapter rank / alpha / dropout | 16 / 32 / 0.05 |
 | 1B adapter parameters | 13,045,760 |
-| Epochs | 5 |
-| Microbatch | 1 example |
+| Epochs / microbatch | 5 / 1 example |
 | Gradient accumulation | 4 steps |
-| Optimizer | AdamW |
-| Learning rate | `2e-4` |
-| Weight decay | 0.01 |
-| Warmup | 20 steps |
+| Optimizer / learning rate | AdamW / `2e-4` |
+| Weight decay / warmup | 0.01 / 20 steps |
 | Maximum gradient norm | 1.0 |
 | Training sequence length | 1,024 tokens |
-| Precision | mixed precision; bf16 when supported |
-| Checkpoint selection | minimum validation loss |
-| 1B peak training memory | 3.88 GB |
+| Precision | Mixed precision; bf16 when supported |
+| Checkpoint selection | Minimum validation loss |
+| Training peak memory (1B) | 3.88 GB |
+| Decoding | Greedy; maximum 256 new tokens |
+| Student generation time | Approximately 12–15 s/example |
+| Evaluation wall time | Approximately 4–5 h for over 1,300 examples |
 
----
-
-### 9. Compact Inference
-
-At inference time:
-
-1. the large preparation model constructs `Rc`, `Rv`, `K_int`, and `K_ext`;
-2. the compact student receives the verification instruction and four evidence fields;
-3. the backbone chat template formats the input;
-4. greedy autoregressive generation produces the response;
-5. only newly generated tokens are decoded;
-6. the JSON parser extracts `pred_label` and `reason`.
-
-Paper decoding configuration:
-
-| Item | Setting |
-|---|---|
-| Decoding | Greedy |
-| Maximum new tokens | 256 |
-| Local student generation time | approximately 12–15 s/example |
-| Evaluation wall time | approximately 4–5 h for more than 1,300 examples |
-
-No separate classifier head is required: the student directly generates the verdict and rationale.
+No separate classifier head is required. The compact model directly generates the verdict and rationale.
 
 ---
 
 ## Datasets
 
-The study combines material from **FakeSV** and **FakeTT**.
+The study uses material from **FakeSV** and **FakeTT**.
 
-| Dataset | Original | Usable | Real | Fake |
+| Collection | Original | Usable | Real | Fake |
 |---|---:|---:|---:|---:|
 | FakeSV | 3,624 | 3,609 | 1,802 | 1,807 |
 | FakeTT | 1,991 | 1,990 | 819 | 1,171 |
 | **Total** | **5,615** | **5,599** | **2,621** | **2,978** |
 
-Publication ranges used in the study:
-
-- **FakeSV:** October 2017 – February 2022
-- **FakeTT:** May 2019 – March 2024
-
-The usable set contains labeled examples that could be successfully processed by the large-model pipeline. Items unavailable because of model-response policies or other processing limitations are excluded.
+The usable inventory contains labeled examples successfully processed by the large-model pipeline.
 
 ---
 
 ## Evaluation Protocol
 
-### Teacher development
+### Teacher Development
 
 The teacher development study compares:
 
@@ -523,75 +364,67 @@ The teacher development study compares:
 2. an initial WEAVE verification prompt;
 3. the developed WEAVE verifier after DSPy-assisted instruction search and manual refinement.
 
-### Student evaluation groups
-
-| Group | Definition | Size |
-|---|---|---:|
-| Test 1 | Held-out teacher-correct examples | 507 |
-| Test 2 | Teacher-error examples excluded from student training | 802 |
-| Pooled diagnostic set | Test 1 ∪ Test 2 | 1,309 |
-
-### Metrics
-
-Student classification is evaluated with:
-
-- accuracy;
-- macro precision;
-- macro recall;
-- macro F1.
-
-Macro metrics are used so that both classes contribute equally to the reported score.
-
-Generated rationales are also inspected separately for whether their stated evidence comparison is actually supported by the supplied record.
-
----
-
-## Results
-
-### Teacher Development Configurations
-
 | Configuration | Accuracy |
 |---|---:|
 | ExMRD-style direct decision, no SLR | 68.36% |
 | WEAVE, initial verification prompt | 73.23% |
 | **WEAVE, developed verification prompt** | **86.39%** |
 
-These are configuration-level teacher-development measurements. They should not be interpreted as the compact student's Test 1/Test 2 results.
+---
 
-The developed verification instruction places greater emphasis on event-level comparisons: matching a person alone is not sufficient when the claim concerns a different location, quotation, date, or event.
+### Student Evaluation Groups
+
+| Group | Definition | Size |
+|---|---|---:|
+| Test 1 | Held-out teacher-correct examples | 507 |
+| Test 2 | Teacher-error examples excluded from student training | 802 |
+| Pooled diagnostic set | Test 1 + Test 2 | 1,309 |
+
+Student classification is evaluated using:
+
+- accuracy;
+- macro precision;
+- macro recall;
+- macro F1.
+
+Generated rationales are inspected separately for whether their stated evidence comparison is actually supported by the supplied record.
 
 ---
 
-### Compact Student Behavior
+## Results
 
-The paper reports the student results by teacher-conditioned evaluation group rather than treating the pooled set as the only result.
+### WEAVE 1B
 
-Observed behavior includes:
+| Evaluation | Accuracy | Macro Precision | Macro Recall | Macro F1 |
+|---|---:|---:|---:|---:|
+| **Test 1** | **88.17%** | **88.99%** | **88.09%** | **88.09%** |
+| **Test 2** | **44.64%** | **36.30%** | **35.58%** | **35.91%** |
+| **Pooled** | **61.50%** | **58.81%** | **58.73%** | **58.76%** |
 
-- strong retention on held-out teacher-correct examples in Test 1;
-- correct predictions on a subset of teacher-error examples in Test 2;
-- lower scores on Test 2 than Test 1, showing that teacher-error examples are the harder condition;
-- a stronger recorded decision profile for the adapted **Gemma-3-1B-it** configuration than the evaluated **Gemma-2-2B-it** configuration in the teacher-error and pooled conditions.
+Test 1 measures retention on held-out teacher-correct examples. Test 2 evaluates the harder teacher-error condition. The teacher-error responses are never supplied as student training targets, so successful predictions on Test 2 indicate behavior beyond simply reproducing the teacher's original labels.
 
-The pooled accuracy depends on both conditional accuracies and the mixture of Test 1/Test 2 examples. For this reason, the paper reports the conditional groups separately.
+### Student Backbone Comparison
+
+| Backbone | Test 2 Accuracy | Pooled Accuracy |
+|---|---:|---:|
+| **Gemma-3-1B-it** | **44.64%** | **61.50%** |
+| Gemma-2-2B-it | 27.81% | 48.20% |
+
+The adapted Gemma-3-1B-it verifier outperforms Gemma-2-2B-it on both shared conditions.
 
 ---
 
-### Computational Characteristics
+## Computational Characteristics
 
-WEAVE separates external-model computation from local student generation.
+WEAVE reallocates online computation.
 
-### External preparation
+| Measure | ExMRD + SLR | WEAVE |
+|---|---:|---:|
+| Remote model requests | 4 | **1** |
+| Mean token use | 2,352.51 | 4,353.46 |
+| Mean API time | 46.41 s | 128.28 s |
 
-The Web-assisted preparation stage performs content reconstruction, model background generation, and search-assisted context construction in a single external-model request.
-
-Compared with the multi-call ExMRD-style pipeline, WEAVE reduces the number of remote model invocations, while the preparation request itself can use more tokens and API processing time.
-
-### Local verifier
-
-The compact student performs the final evidence-to-response mapping locally using its frozen quantized backbone and learned adapters.
-
-This stage is a generative verifier rather than a single forward-pass classification head because it autoregressively generates both the verdict and its rationale.
+The single preparation request reduces remote invocations while using more tokens and API processing time. Once the evidence fields are available, the compact local student generates the final verdict and rationale.
 
 ---
 
@@ -607,124 +440,41 @@ A useful rationale should identify:
 
 A label can match the dataset annotation while its rationale is still weak or unsupported. Rationale quality is therefore not treated as equivalent to classification accuracy.
 
-### Example: visually expressed claim
-
-A screen recording may display a shutdown announcement while its transcript contains only a generic closing phrase. In this case:
-
-- `Rc` alone may contain little useful information;
-- `Rv` can recover the visible assertion from the video frames;
-- `K_ext` can provide event-specific external context;
-- the compact verifier can then state the decisive comparison in its generated reason.
-
-This illustrates why WEAVE preserves claim-bearing visual content instead of relying only on speech or titles.
-
 ---
 
 ## Repository Structure
 
-The repository keeps much of the original experimental directory layout so that earlier scripts and baselines remain reproducible.
+The repository preserves earlier experimental layouts for reproducibility.
 
 ```text
-WEAVE-ShortVideo-Misinformation-Detection/
-│
+.
+├── weave_bigdata26.pdf
+├── README.md
 ├── preprocess/
-│   ├── 1.Extract_Frames.py
-│   ├── 1.Video2Wav.py
-│   ├── 2.Frames_Compress.py
-│   ├── 2.Wav2Transcript.py
-│   ├── 3.Frames2OCR.py
-│   └── 4.Data_Merge.py
-│
 ├── CoT/
-│   ├── 1.Retrieve.py
-│   ├── 2.Reason.py
-│   ├── 3.DSPy.py
-│   ├── 4.Accuracy.py
-│   ├── 5.Error.py
-│   └── Refine_compare.py
-│
 ├── ExMRD/
-│   ├── 1.texture_refine.py
-│   ├── 2.visual_refine.py
-│   ├── 3.retrieve.py
-│   ├── 4.reason.py
-│   ├── 5.predict.py
-│   ├── 6.evaluate.py
-│   ├── 7.baseline.py
-│   ├── extract_frame_original.py
-│   ├── frames_to_quad_4_original.py
-│   └── ocr_original.py
-│
 ├── LLM_5_Stage/
-│   └── ...
-│
 ├── data/
 │   └── ALL/
-│
-├── assets/
-│   └── system_pipeline.png
-│
-└── README.md
+└── assets/
 ```
 
----
-
-### Codebase / Paper Alignment
-
-The research direction evolved from the earlier **Refine–Retrieve–Reason** pipeline into the paper's final **WEAVE** formulation. The codebase intentionally retains several original file and directory names.
-
-This means that **directory names should not be interpreted as the final conceptual architecture**.
-
-| Existing code area | Role in the repository | Relation to final WEAVE paper |
-|---|---|---|
-| `preprocess/` | Video/audio/OCR preprocessing utilities | Contains reusable and legacy preprocessing code; the paper emphasizes Whisper, representative frames, and chronological VLM description |
-| `CoT/` | Retrieval/reasoning/prompt-development experiments | Closest existing implementation area for evidence preparation and teacher prompt development |
-| `ExMRD/` | ExMRD reproduction / baseline | Baseline and comparison implementation |
-| `LLM_5_Stage/` | Earlier experimental pipeline | Historical intermediate implementation |
-| `data/ALL/` | Data, intermediate outputs, predictions, experiments | Shared experimental data organization |
-| `assets/` | Repository figures | May contain figures from earlier project iterations |
-
-### Important note on legacy preprocessing
-
-Scripts such as SSIM-based frame compression and PaddleOCR remain useful experimental utilities and are preserved in the repository. However, they should not be presented as defining components of the final paper architecture unless they are explicitly enabled in a particular reproduction configuration.
-
-The final paper methodology centers on:
-
-```text
-Whisper transcript
-+ representative frames
-+ Qwen3-VL chronological description
-        │
-        ▼
-Rc / Rv / K_int / K_ext evidence construction
-        │
-        ▼
-Teacher verdict-rationale supervision
-        │
-        ▼
-QLoRA-adapted compact verifier
-```
+Existing code areas should not be interpreted as the final conceptual architecture of the paper.
 
 ---
 
 ## Data Organization
 
-The existing repository stores dataset metadata and experiment outputs under:
+Raw data:
 
 ```text
 data/ALL/
+├── videos/
+├── data.jsonl
+└── label.jsonl
 ```
 
-### Raw data
-
-```text
-data/ALL/
-├── videos/       # source short-form videos
-├── data.jsonl    # video metadata / content records
-└── label.jsonl   # ground-truth labels
-```
-
-### Existing preprocessed data
+Existing preprocessed data:
 
 ```text
 data/ALL/
@@ -732,20 +482,15 @@ data/ALL/
 └── all.jsonl
 ```
 
-### Existing experimental outputs
+Existing experimental outputs:
 
 ```text
 data/ALL/
-│
 ├── CoT/
 │   └── gemma-4-31b-it/
-│
 ├── Final_v1/
-│
 ├── Final_v2/
-│
 ├── Final_v3/
-│
 └── DSPy/
 ```
 
@@ -755,9 +500,9 @@ These directory names reflect the development history of the project and are ret
 
 ## Running the Existing Codebase
 
-Because the repository preserves the earlier experimental layout, the commands below describe the **existing executable organization**. They should be interpreted together with the paper-alignment notes above.
+Because the repository preserves the earlier experimental layout, the commands below describe the existing executable organization.
 
-### 1. Prepare data
+### 1. Prepare Data
 
 Place videos under:
 
@@ -772,7 +517,7 @@ data/ALL/data.jsonl
 data/ALL/label.jsonl
 ```
 
-### 2. Existing preprocessing utilities
+### 2. Existing Preprocessing Utilities
 
 ```bash
 # Extract frames
@@ -800,19 +545,19 @@ The existing merged output is stored at:
 data/ALL/all.jsonl
 ```
 
-### 3. Existing evidence/retrieval script
+### 3. Existing Evidence / Retrieval Script
 
 ```bash
 python CoT/1.Retrieve.py
 ```
 
-### 4. Existing reasoning script
+### 4. Existing Reasoning Script
 
 ```bash
 python CoT/2.Reason.py
 ```
 
-### 5. DSPy / MIPROv2 prompt development
+### 5. DSPy / MIPROv2 Prompt Development
 
 ```bash
 python CoT/3.DSPy.py
@@ -824,7 +569,7 @@ python CoT/3.DSPy.py
 python CoT/4.Accuracy.py
 ```
 
-> The final paper additionally includes compact-student QLoRA adaptation and verdict–rationale generation. The exact training entry point should follow the experiment-specific training code in the repository; this README intentionally does not assign an unverified script path to that stage.
+> The final paper additionally includes compact-student QLoRA adaptation and verdict–rationale generation. Historical script names are preserved rather than assigning an unverified training entry point to the final WEAVE stage.
 
 ---
 
@@ -880,23 +625,21 @@ It is retained as the main historical baseline for comparison.
 
 ```text
 Texture Refinement
-        │
-        ▼
+        |
+        v
 Visual Refinement
-        │
-        ▼
+        |
+        v
 Retrieval
-        │
-        ▼
+        |
+        v
 Reasoning
-        │
-        ▼
+        |
+        v
 Prediction
 ```
 
-The WEAVE paper uses an ExMRD-style direct large-model decision without SLR as one teacher-development reference configuration and separately discusses the multi-stage ExMRD computation profile.
-
-### Earlier LLM five-stage pipeline
+### Earlier LLM Five-Stage Pipeline
 
 An intermediate implementation is retained under:
 
@@ -906,7 +649,7 @@ LLM_5_Stage/
 
 This directory represents an earlier stage of the project and is not the conceptual organization used to describe the final WEAVE framework.
 
-### Earlier Refine–Retrieve–Reason naming
+### Earlier Refine–Retrieve–Reason Naming
 
 Some scripts and the separate WebApp repository still use the earlier **Refine–Retrieve–Reason** naming. These names are retained to avoid unnecessary code and link breakage while the research method is documented under the final WEAVE formulation.
 
@@ -937,76 +680,46 @@ The WebApp repository keeps its original name and URL. It provides the interacti
 
 ## Research Questions
 
-The paper is organized around three research questions:
-
-### RQ1 — Teacher development
+### RQ1 — Teacher Development
 
 How do the developed large-model configurations behave when preparing supervision?
 
-### RQ2 — Compact verifier behavior
+### RQ2 — Compact Verifier Behavior
 
 How does the compact verifier perform across teacher-correct and teacher-error groups, and across different student backbones?
 
-### RQ3 — Rationale evidence relationships
+### RQ3 — Rationale Evidence Relationships
 
-Which claim–evidence relationships appear in the generated rationales, and are those relationships supported by the supplied evidence?
-
----
-
-## Design Principles
-
-The final WEAVE formulation follows several practical principles:
-
-1. **Preserve the claim wherever it appears.**  
-   Important assertions may appear in speech, captions, titles, or briefly visible screen text.
-
-2. **Compare events, not only recognizable entities.**  
-   Matching a person or topic is insufficient when the claim concerns a different action, date, location, quotation, or event.
-
-3. **Keep evidence roles explicit.**  
-   Model recollection and Web-derived information are separated into `K_int` and `K_ext`.
-
-4. **Make the verdict's training weight explicit.**  
-   Separate label/rationale normalization prevents long explanations from dominating the learning objective only because they contain more tokens.
-
-5. **Evaluate student behavior conditionally.**  
-   Teacher-correct and teacher-error groups reveal different aspects of knowledge transfer.
-
-6. **Inspect what the rationale actually claims.**  
-   A correct binary prediction does not guarantee a supported explanation.
+How do generated rationales relate the video's claim to the supplied evidence, and when are those explanations actually supported by the evidence record?
 
 ---
 
-## Limitations and Future Directions
+## Web Demo
 
-The paper identifies several directions for further development:
+The existing WebApp URL is intentionally preserved:
 
-- claim-focused evidence selection under a fixed context budget;
-- passage-linked rationale supervision;
-- source-separated evaluation;
-- event-separated evaluation;
-- temporal evidence policies that distinguish retrospective verification from time-restricted verification;
-- explicit evidence-insufficient outcomes when appropriate labels and evaluation protocols are available.
-
-These directions aim to make the compact verifier's generated explanation more directly traceable to the evidence supporting it.
+### [Refine-Retrieve-Reason-FakeNews-WebApp](https://github.com/tyh1003/Refine-Retrieve-Reason-FakeNews-WebApp)
 
 ---
 
 ## Citation
 
-If you use this repository in academic work, please cite the paper:
+If you use this work, please cite the paper:
 
-> **From Web Evidence to Compact Verifiers: Distilling Verdicts and Rationales for Short-Video Misinformation Detection**  
-> Chun-Yi Shih, Kai-Yun Hsiao, Yi-Hsien Tsai, Cheng-Te Li.  
-> Department of Computer Science and Information Engineering, National Cheng Kung University, Taiwan.
+```bibtex
+@inproceedings{weave,
+  title  = {From Web Evidence to Compact Verifiers: Distilling Verdicts and Rationales for Short-Video Misinformation Detection},
+  author = {Chun-Yi Shih and Kai-Yun Hsiao and Yi-Hsien Tsai and Cheng-Te Li},
+  note   = {WEAVE: Web Evidence-Assisted Video Examination}
+}
+```
 
-Publication-specific BibTeX information can be added here once the final venue / bibliographic record is available.
+Publication venue/year/DOI should be added when the final bibliographic record is available.
 
 ---
 
-## Notes
+## Full Paper
 
-- The current repository name recommended for the paper-aligned codebase is **`WEAVE-ShortVideo-Misinformation-Detection`**.
-- The codebase retains older directory names to preserve experimental history and minimize unnecessary implementation changes.
-- The final conceptual method should be referred to as **WEAVE (Web Evidence-Assisted Video Examination)** rather than Refine–Retrieve–Reason.
-- The original interactive WebApp GitHub link is intentionally preserved.
+For the complete methodology, experimental setup, results, and analysis:
+
+**[Read the Full Paper](./weave_bigdata26.pdf)**
