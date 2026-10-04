@@ -1,4 +1,4 @@
-# WEAVE: Web Evidence-Assisted Video Examination
+<img width="1823" height="1084" alt="image" src="https://github.com/user-attachments/assets/9cad63f7-5fe2-48bc-bf08-87d409be0a70" /># WEAVE: Web Evidence-Assisted Video Examination
 
 > **From Web Evidence to Compact Verifiers: Distilling Verdicts and Rationales for Short-Video Misinformation Detection**
 
@@ -48,8 +48,7 @@ A large reasoning teacher generates offline verdict–rationale targets. Teacher
 
 ## Framework
 
-WEAVE separates online evidence preparation from offline distillation.
-
+WEAVE separates online verification from offline distillation.
 <img width="1879" height="856" alt="image" src="https://github.com/user-attachments/assets/aac967ee-e16e-4173-87c6-18d9f6739abf" />
 
 
