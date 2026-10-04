@@ -50,45 +50,8 @@ A large reasoning teacher generates offline verdict–rationale targets. Teacher
 
 WEAVE separates online evidence preparation from offline distillation.
 
-```text
-Short Video + Title / Description
-                |
-                v
-       Multimodal Content Recovery
-        /                    \
-       /                      \
-Whisper Large V3       Visual Processing
-Speech Transcript      Representative Frames
-                       + Qwen3-VL Description
-       \                      /
-        \                    /
-                |
-                v
-     Web-Assisted Evidence Preparation
-       Gemma 4 31B IT + Google Search
-                |
-                v
-       Four-Field Evidence Interface
-       +--------+--------+--------+
-       |        |        |        |
-      Rc       Rv      K_int    K_ext
-       |        |        |        |
-       +--------+--------+--------+
-                |
-        +-------+-------+
-        |               |
-        v               v
- Offline Distillation   Online Inference
-        |               |
- Teacher Verdict +      Compact WEAVE
- Rationale              Verifier
-        |               |
- Teacher-Correct        Verdict + Rationale
- Supervision
-        |
-        v
- QLoRA Adaptation
-```
+<img width="1879" height="856" alt="image" src="https://github.com/user-attachments/assets/aac967ee-e16e-4173-87c6-18d9f6739abf" />
+
 
 The central idea is that **evidence preparation and final judgment are different tasks**. Large models recover and organize relevant evidence, while the compact verifier performs the final evidence comparison.
 
