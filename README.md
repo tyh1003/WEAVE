@@ -621,7 +621,7 @@ Some scripts and the separate WebApp repository still use the earlier **Refineâ€
 
 An interactive web application is available in a separate repository:
 
-### [Refine-Retrieve-Reason-FakeNews-WebApp](https://github.com/tyh1003/Refine-Retrieve-Reason-FakeNews-WebApp)
+### [WEAVE-WebApp](https://github.com/tyh1003/WEAVE-WebApp)
 
 The WebApp repository keeps its original name and URL. It provides the interactive demonstration interface associated with this research project, while this repository focuses on the technical pipeline, experimental code, baselines, and compact-verifier study.
 
@@ -660,21 +660,8 @@ How do generated rationales relate the video's claim to the supplied evidence, a
 
 The existing WebApp URL is intentionally preserved:
 
-### [Refine-Retrieve-Reason-FakeNews-WebApp](https://github.com/tyh1003/Refine-Retrieve-Reason-FakeNews-WebApp)
+### [WEAVE-WebApp](https://github.com/tyh1003/WEAVE-WebApp)
 
----
-
-## Citation
-
-If you use this work, please cite the paper:
-
-```bibtex
-@inproceedings{weave,
-  title  = {From Web Evidence to Compact Verifiers: Distilling Verdicts and Rationales for Short-Video Misinformation Detection},
-  author = {Chun-Yi Shih and Kai-Yun Hsiao and Yi-Hsien Tsai and Cheng-Te Li},
-  note   = {WEAVE: Web Evidence-Assisted Video Examination}
-}
-```
 
 Publication venue/year/DOI should be added when the final bibliographic record is available.
 
